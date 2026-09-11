@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<title>Meu Piscineiro V2</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+header{background:#111827;color:white;padding:18px 16px;position:sticky;top:0;z-index:5}
+header h1{margin:0 0 4px;font-size:22px} header p{margin:0;color:#cbd5e1;font-size:13px}
+main{max-width:760px;margin:auto;padding:14px 12px 90px}.card{background:white;border-radius:16px;padding:15px;margin:10px 0;box-shadow:0 2px 10px #00000012}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.stat{padding:14px;border-radius:14px;background:#e5e7eb}.stat b{display:block;font-size:24px}
+button,input,select,textarea{font:inherit}button{border:0;border-radius:10px;padding:10px 12px;cursor:pointer}
+.primary{background:#111827;color:#fff}.green{background:#16a34a;color:#fff}.blue{background:#2563eb;color:#fff}.red{background:#dc2626;color:#fff}.gray{background:#e5e7eb}
+input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px;margin:5px 0 10px}
+label{font-size:13px;font-weight:bold}.row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.small{font-size:12px;color:#6b7280}
+.house h3{margin:0}.house{border-left:5px solid #2563eb}.task{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #eee}.task:last-child{border-bottom:0}.done{text-decoration:line-through;color:#9ca3af}
+.visit{border-left:5px solid #16a34a}.visit.pending{border-left-color:#f59e0b}.date{font-size:12px;color:#6b7280}.pill{display:inline-block;background:#e5e7eb;padding:4px 7px;border-radius:999px;font-size:11px}
+nav{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid #ddd;display:flex;justify-content:center;gap:6px;padding:8px;z-index:10}nav button{flex:1;max-width:180px}
+.hidden{display:none}.danger{color:#b91c1c}
+</style>
+</head>
+<body>
+<header><h1>🏊 Meu Piscineiro</h1><p>Agenda, visitas, produtos e ganhos</p></header>
+<main>
+<section id="today"></section>
+<section id="houses"></section>
+<section id="newHouse" class="card hidden">
+<h2>Nova casa</h2>
+<label>Nome do cliente</label><input id="name" placeholder="Ex.: João">
+<label>Endereço</label><input id="address" placeholder="Rua, número, bairro">
+<label>Telefone</label><input id="phone" placeholder="(00) 00000-0000">
+<label>Dia fixo</label><select id="day">
+<option>Segunda</option><option>Terça</option><option>Quarta</option><option>Quinta</option><option>Sexta</option><option>Sábado</option><option>Domingo</option>
+</select>
+<button class="primary" onclick="saveHouse()">Salvar casa</button>
+</section>
+<section id="agenda" class="hidden"></section>
+<section id="finance" class="hidden"></section>
+</main>
+<nav><button class="gray" onclick="show('today')">Hoje</button><button class="gray" onclick="show('houses')">Casas</button><button class="gray" onclick="show('agenda')">Agenda</button><button class="gray" onclick="show('finance')">💰</button><button class="primary" onclick="toggleNew()">＋ Casa</button></nav>
+<script>
+const KEY='meu_piscineiro_v2';
+let data=JSON.parse(localStorage.getItem(KEY)||'null')||{houses:[],visits:[],earnings:[]};
+const days=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function id(){return Date.now()+Math.random().toString(16).slice(2)}
+function fmt(s){return new Date(s+'T12:00:00').toLocaleDateString('pt-BR')}
+function todayISO(){let d=new Date();return d.toISOString().slice(0,10)}
+function addDays(n){let d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+function show(sec){['today','houses','agenda','finance'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==sec));render()}
+function toggleNew(){document.getElementById('newHouse').classList.toggle('hidden')}
+function saveHouse(){
+let h={id:id(),name:name.value.trim(),address:address.value.trim(),phone:phone.value.trim(),day:day.value,tasks:[{id:id(),text:'Limpar piscina',done:false},{id:id(),text:'Verificar pH',done:false},{id:id(),text:'Verificar cloro',done:false}],productHistory:[]};
+if(!h.name)return alert('Digite o nome do cliente.');data.houses.push(h);save();toggleNew();render();
+}
+function house(h){return `<div class="card house"><h3>🏠 ${h.name}</h3><div class="small">${h.address||'Sem endereço'} · ${h.day}</div><div class="row" style="margin-top:9px"><button class="blue" onclick="maps('${encodeURIComponent(h.address)}')">📍 Mapa</button><button class="green" onclick="wa('${h.phone}')">📞 WhatsApp</button><button class="gray" onclick="product('${h.id}')">🧪 Produto</button></div>${h.tasks.map(t=>`<div class="task ${t.done?'done':''}"><input type="checkbox" style="width:auto" ${t.done?'checked':''} onchange="toggleTask('${h.id}','${t.id}')"><span>${t.text}</span></div>`).join('')}<div class="row" style="margin-top:8px"><button class="gray" onclick="addTask('${h.id}')">＋ tarefa</button><button class="red" onclick="delHouse('${h.id}')">Excluir</button></div></div>`}
+function toggleTask(h,t){let x=data.houses.find(a=>a.id===h).tasks.find(a=>a.id===t);x.done=!x.done;save();render()}
+function addTask(h){let text=prompt('Nova tarefa:');if(text){data.houses.find(a=>a.id===h).tasks.push({id:id(),text,done:false});save();render()}}
+function delHouse(h){if(confirm('Excluir esta casa?')){data.houses=data.houses.filter(x=>x.id!==h);save();render()}}
+function product(hid){
+let h=data.houses.find(x=>x.id===hid), delay=prompt('Voltar para aspirar em quantos dias? Digite 1 ou 2.','1');
+delay=Number(delay);if(![1,2].includes(delay))return alert('Escolha 1 ou 2 dias.');
+let obs=prompt('Observação do produto (opcional):','');
+let date=addDays(delay);h.productHistory.push({date:todayISO(),obs});data.visits.push({id:id(),houseId:hid,date,type:'Aspiração após produto',done:false,obs});
+let maint=prompt('Agendar produto de manutenção depois? Digite a quantidade de dias ou deixe vazio.','');
+if(maint!==null && maint.trim()!==''){let md=Number(maint);if(md>0)data.visits.push({id:id(),houseId:hid,date:addDays(delay+md),type:'Produto de manutenção',done:false,obs:''})}
+save();render();alert('Visitas automáticas criadas para '+fmt(date)+'.')}
+function completeVisit(v){v.done=!v.done;save();render()}
+function maps(a){if(!a)return alert('Cadastre o endereço.');location.href='https://www.google.com/maps/search/?api=1&query='+a}
+function wa(p){if(!p)return alert('Cadastre o telefone.');location.href='https://wa.me/55'+p.replace(/\D/g,'')}
+function render(){
+renderToday();renderHouses();renderAgenda();renderFinance();
+}
+function renderToday(){
+let d=todayISO(), visits=data.visits.filter(v=>v.date===d), due=data.houses.filter(h=>h.day===days[new Date().getDay()]);
+document.getElementById('today').innerHTML=`<div class="card"><h2>📅 Hoje — ${new Date().toLocaleDateString('pt-BR')}</h2><div class="grid"><div class="stat"><b>${due.length}</b>casas no dia fixo</div><div class="stat"><b>${visits.filter(v=>!v.done).length}</b>visitas extras</div></div></div>`+(visits.length?visits.map(v=>{let h=data.houses.find(x=>x.id===v.houseId);return `<div class="card visit ${v.done?'':'pending'}"><b>${v.done?'✅':'⏳'} ${v.type}</b><div>${h?.name||'Casa removida'}</div><div class="small">${v.obs||''}</div><button class="${v.done?'gray':'green'}" onclick="completeVisit(data.visits.find(x=>x.id==='${v.id}'))">${v.done?'Desmarcar':'Concluir'}</button></div>`}).join(''):'<div class="card">Nenhuma visita automática para hoje.</div>')}
+function renderHouses(){
+let out='<h2>🏠 Minhas casas</h2>';days.slice(1).concat(['Domingo']).forEach(d=>{let hs=data.houses.filter(h=>h.day===d);if(hs.length)out+=`<h3>${d}</h3>`+hs.map(house).join('')});document.getElementById('houses').innerHTML=out}
+function renderAgenda(){
+let all=[...data.visits].sort((a,b)=>a.date.localeCompare(b.date));document.getElementById('agenda').innerHTML='<h2>🗓️ Agenda</h2>'+(all.length?all.map(v=>{let h=data.houses.find(x=>x.id===v.houseId);return `<div class="card visit"><div class="date">${fmt(v.date)}</div><b>${v.type}</b><div>🏠 ${h?.name||'Casa removida'}</div><span class="pill">${v.done?'Concluída':'Pendente'}</span></div>`}).join(''):'<div class="card">Nenhuma visita agendada.</div>')}
+function renderFinance(){
+let total=data.earnings.reduce((s,e)=>s+Number(e.value||0),0);document.getElementById('finance').innerHTML=`<div class="card"><h2>💰 Financeiro</h2><div class="stat"><b>R$ ${total.toFixed(2).replace('.',',')}</b>total registrado</div><button class="primary" style="margin-top:10px" onclick="earn()">＋ Registrar pagamento</button></div>`+(data.earnings.length?data.earnings.map(e=>`<div class="card"><b>${e.name}</b><div>R$ ${Number(e.value).toFixed(2).replace('.',',')} · ${fmt(e.date)}</div></div>`).join(''):'')}
+function earn(){let name=prompt('Cliente:');if(!name)return;let value=prompt('Valor:');if(!value)return;data.earnings.push({name,value:value.replace(',','.'),date:todayISO()});save();render()}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+show('today');
+</script>
+</body>
+</html>
